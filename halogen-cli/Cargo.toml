@@ -1,0 +1,34 @@
+[package]
+name = "halogen-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Davide Mor <tazdevil971@gmail.com>"]
+
+[[bin]]
+name = "halogen"
+path = "src/main.rs"
+
+[features]
+default = [
+    "frontend-chiptool", "frontend-stm32-data", 
+    "backend-rust", "backend-cpp", "backend-c", 
+    "rayon"
+]
+
+rayon = ["halogen-backend/rayon", "halogen-frontend/rayon"]
+backend-rust = ["halogen-backend/rust"]
+backend-cpp = ["halogen-backend/cpp"]
+backend-c = ["halogen-backend/c"]
+frontend-chiptool = ["halogen-frontend/chiptool"]
+frontend-stm32-data = ["halogen-frontend/stm32-data"]
+
+[dependencies]
+halogen-ir = { workspace = true }
+halogen-backend = { workspace = true }
+halogen-frontend = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+
+env_logger = "0.11"
+regex = "1.11"
+clap = { version = "4.5", features = ["derive"] }
