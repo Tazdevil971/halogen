@@ -1,0 +1,61 @@
+{% import "macro.tera" as macro %}
+
+{% macro gen_block(block) %}
+    {% set name = block.name | to_type_name -%}
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    {{ macro::gen_doc(item=block) }}
+    pub struct {{ name }} {
+        ptr: *mut u8
+    }
+
+    impl {{ name }} {
+        #[inline(always)]
+        pub const unsafe fn from_ptr(ptr: *mut u8) -> Self {
+            Self { ptr }
+        }
+
+        #[inline(always)]
+        pub const fn as_ptr(&self) -> *mut u8 {
+            self.ptr
+        }
+
+        {% for field in block.fields | sort(attribute="byte_offset") -%}
+            {% set fname = field.name | to_fn_name -%}
+            {% if "block_name" in field -%}
+                {% set ftype = field.block_name | to_type_name -%}
+            {% elif "bitfield_name" in field -%}
+                {% set access = macro::gen_access(access=field.access) -%}    
+                {% set ftype = field.bitfield_name | to_type_name -%}
+                {% set ftype = "utils::Reg<" ~ ftype ~ ", " ~ access ~ ">" -%}
+            {% else -%}
+                {% set access = macro::gen_access(access=field.access) -%}    
+                {% set ftype = macro::gen_type(size=field.bit_size) -%}
+                {% set ftype = "utils::Reg<" ~ ftype ~ ", " ~ access ~ ">" -%}
+            {% endif -%}
+
+            {% if "array" in field -%}
+                {% set base = field.byte_offset | hex -%}
+                {% set stride = field.array.stride | hex -%}
+                {% set offset = "(" ~ base ~ "+ idx *" ~ stride ~ ")" -%}
+            {% else -%}
+                {% set offset = field.byte_offset | hex -%}
+            {% endif -%}
+
+            #[inline(always)]
+            {{ macro::gen_doc(item=field) }}
+            {% if "array" in field -%}
+            pub const fn {{ fname }}(&self, idx: usize) -> {{ ftype }} {
+                assert!(idx < {{ field.array.len }});
+            {% else -%}
+            pub const fn {{ fname }}(&self) -> {{ ftype }} {
+            {% endif -%}
+                unsafe {
+                    let ptr = self.ptr.add({{ offset }});
+                    <{{ ftype }}>::from_ptr(ptr)
+                }
+            }
+        {% endfor -%}
+    }
+
+{% endmacro gen_block %}
