@@ -1,0 +1,25 @@
+{% import "macro.tera" as macro %}
+
+{% macro gen_chips(chips) %}
+    {{ macro::gen_utils() }}
+
+    {% set chips = chips | sort(attribute="name") -%}
+
+    {% for chip in chips -%}
+        {% set name = chip.name | snake_case | escape_keyword -%}
+        {% set path = root ~ "/chips/" ~ name ~ ".rs" -%}
+
+        #[cfg(target_chip = "{{ name }}")]
+        include!("{{ path }}");
+
+        {% if "arm_ext" in chip and core_path -%}
+            {% set cname = chip.arm_ext.core_name | snake_case | escape_keyword %}
+            {% set cpath = core_path ~ "/chips/" ~ cname ~ ".rs" %}
+        
+            #[cfg(target_chip = "{{ name }}")]
+            include!("{{ cpath }}");
+        {% endif -%}
+    {% endfor %}
+{% endmacro gen_chips %}
+
+{{ self::gen_chips(chips=chips) }}

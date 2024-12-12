@@ -1,0 +1,27 @@
+{% import "macro.tera" as macro %}
+{% import "module.tera" as module %}
+
+{% macro gen_chip(chip) %}
+    {{ macro::gen_utils() }}
+
+    {% set imports = chip.imports | sort(attribute="name") -%}
+
+    {% for import in imports -%}
+        {{ module::gen_module_import(import=import) }}
+    {% endfor %}
+
+    {% for peripheral in chip.peripherals | sort(attribute="address") -%}
+        {% set pname = peripheral.name | shouty_snake_case | escape_keyword -%}
+        {% set mname = peripheral.module | lower_camel_case | escape_keyword -%}
+        {% set bname = peripheral.block | upper_camel_case | escape_keyword -%}
+
+        {% set type = mname ~ "::" ~ bname %}
+
+        {{ macro::gen_doc(item=peripheral) }}
+        pub const {{ pname }}: {{ type }} = {{ type }}::from_ptr({{ peripheral.address | hex }} as _);
+
+    {% endfor %}
+
+{% endmacro gen_chip %}
+
+{{ self::gen_chip(chip=chip) }}

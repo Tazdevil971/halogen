@@ -1,0 +1,28 @@
+{% import "macro.tera" as macro %}
+
+{% macro gen_enum(enum) %}
+    {% set type = macro::gen_type(size=enum.bit_size) -%}
+    {% set name = enum.name | upper_camel_case | escape_keyword -%}
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    {{ macro::gen_doc(item=enum) }}
+    #[repr({{ type }})]
+    pub enum {{ name }} {
+        {% for variant in enum.variants | sort(attribute="value") -%}
+        {{ macro::gen_doc(item=variant) }}
+        {{ variant.name | upper_camel_case | escape_keyword }} = {{ variant.value | hex }},
+        {% endfor -%}
+    }
+
+    impl {{ name }} {
+        #[inline(always)]
+        pub const unsafe fn from_bits_unchecked(bits: {{ type }}) -> Self {
+            ::core::mem::transmute(bits)
+        }
+
+        #[inline(always)]
+        pub const fn to_bits(self) -> {{ type }} {
+            self as {{ type }}
+        }
+    }
+{% endmacro gen_enum %}
