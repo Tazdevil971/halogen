@@ -1,0 +1,66 @@
+{% import "macro.tera" as macro -%}
+{% import "module.tera" as module -%}
+
+{% macro gen_chip(chip) -%}
+    {{ macro::gen_utils() }}
+
+    {% for import in chip.imports | sort(attribute="name") -%}
+        {{ module::gen_module_import(import=import) }}
+    {% endfor -%}
+
+    {% for peripheral in chip.peripherals | sort(attribute="address") -%}
+        {% set mod_name = peripheral.module | snake_case | escape_keyword -%}
+        {% set peri_name = peripheral.name | shouty_snake_case | escape_keyword -%}
+        {% set type = peripheral.block_name | upper_camel_case | escape_keyword -%}
+        {% set type = mod_name ~ "::" ~ type -%}
+
+        {{ macro::gen_doc(item=peripheral) }}
+        pub const {{ peri_name }}: {{ type }} = unsafe { 
+            <{{ type }}>::from_ptr({{ peripheral.address | hex }}u64 as _) 
+        };
+    {% endfor -%}
+
+    {% if "cm_ext" in chip -%}
+        {% for cm_reg in chip.cm_ext.cm_regs | sort(attribute="name") -%}
+            {% set mod_name = cm_reg.module | snake_case | escape_keyword -%}
+            {% set reg_name = cm_reg.name | lower_camel_case | escape_keyword -%}
+            {% set type = cm_reg.bitfield_name | upper_camel_case | escape_keyword -%}
+            {% set type = mod_name ~ "::fields::" ~ type -%}
+
+            {{ macro::gen_doc(item=cm_reg) }}
+            pub mod {{ reg_name }} {
+                #[allow(unused_imports)]
+                use super::*;
+
+                {% if cm_reg.access == "ro" or cm_reg.access == "rw" -%}
+                pub unsafe fn read() -> {{ type }} {
+                    let value: u32;
+                    unsafe {
+                        ::core::arch::asm!(
+                            "mrs {}, {{ cm_reg.reg_name }}",
+                            out(reg) value,
+                            options(nomem, nostack, preserves_flags)
+                        );
+                        <{{ type }}>::from_bits_unchecked(value)
+                    }
+                }
+                {% endif -%}
+                
+                {% if cm_reg.access == "wo" or cm_reg.access == "rw" -%}
+                    pub unsafe fn write(value: {{ type }}) {
+                        let value = value.to_bits();
+                        unsafe {
+                            ::core::arch::asm!(
+                                "msr {{ cm_reg.reg_name }}, {}",
+                                in(reg) value,
+                                options(nomem, nostack, preserves_flags)
+                            );
+                        }
+                    }
+                {% endif -%}
+            }
+        {% endfor -%}
+    {% endif -%}
+{% endmacro gen_chip -%}
+
+{{ self::gen_chip(chip=chip) }}

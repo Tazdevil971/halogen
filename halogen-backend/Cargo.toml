@@ -1,0 +1,22 @@
+[package]
+name = "halogen-backend"
+version = "0.1.0"
+edition = "2024"
+authors = ["Davide Mor <tazdevil971@gmail.com>"]
+
+[features]
+default = ["rayon"]
+
+rayon = ["dep:rayon"]
+rust = []
+cpp = []
+c = []
+
+[dependencies]
+halogen-ir = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+rayon = { workspace = true, optional = true }
+
+tera = "1.20"
+heck = "0.5"
