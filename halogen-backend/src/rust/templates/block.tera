@@ -1,0 +1,68 @@
+{% import "macro.tera" as macro -%}
+
+{% macro gen_block(block) -%}
+    {% set name = macro::block_name(raw=block.name) -%}
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    {{ macro::gen_doc(item=block) }}
+    pub struct {{ name }} {
+        ptr: *mut u8
+    }
+
+    impl {{ name }} {
+        #[inline(always)]
+        pub const unsafe fn from_addr(addr: usize) -> Self {
+            unsafe {
+                Self::from_ptr(addr as _)
+            }
+        }
+
+        #[inline(always)]
+        pub const unsafe fn from_ptr(ptr: *mut u8) -> Self {
+            Self { ptr }
+        }
+
+        #[inline(always)]
+        pub const fn as_ptr(&self) -> *mut u8 {
+            self.ptr
+        }
+
+        {% for field in block.fields | sort(attribute="byte_offset") -%}
+            {% set field_name = macro::field_name(raw=field.name) -%}
+            {% if "block_name" in field -%}
+                {% set field_type = macro::block_name(raw=field.block_name) -%}
+            {% elif "bitfield_name" in field -%}
+                {% set access = macro::gen_access(access=field.access) -%}    
+                {% set field_type = macro::bitfield_name(raw=field.bitfield_name) -%}
+                {% set field_type = "utils::Reg<" ~ field_type ~ ", " ~ access ~ ">" -%}
+            {% else -%}
+                {% set access = macro::gen_access(access=field.access) -%}    
+                {% set field_type = macro::gen_type(size=field.bit_size) -%}
+                {% set field_type = "utils::Reg<" ~ field_type ~ ", " ~ access ~ ">" -%}
+            {% endif -%}
+
+            {% if "array" in field -%}
+                {% set base = field.byte_offset | hex -%}
+                {% set stride = field.array.stride | hex -%}
+                {% set offset = base ~ "+ idx *" ~ stride -%}
+            {% else -%}
+                {% set offset = field.byte_offset | hex -%}
+            {% endif -%}
+
+            #[inline(always)]
+            {{ macro::gen_doc(item=field) }}
+            {% if "array" in field -%}
+            pub const fn {{ field_name }}(&self, idx: usize) -> {{ field_type }} {
+                assert!(idx < {{ field.array.len }});
+            {% else -%}
+            pub const fn {{ field_name }}(&self) -> {{ field_type }} {
+            {% endif -%}
+                unsafe {
+                    let ptr = self.ptr.add({{ offset }});
+                    <{{ field_type }}>::from_ptr(ptr)
+                }
+            }
+        {% endfor -%}
+    }
+
+{% endmacro gen_block -%}

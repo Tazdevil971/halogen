@@ -1,0 +1,44 @@
+{% import "block.tera" as block -%}
+{% import "bitfield.tera" as bitfield -%}
+{% import "enum.tera" as enum -%}
+{% import "macro.tera" as macro -%}
+
+{% macro gen_module_inline(module) -%}
+    pub mod {{ macro::mod_name(raw=module.name) }} {
+        use super::utils;
+        {{ self::gen_module(module=module) }}
+    }
+{% endmacro gen_module_inline -%}
+
+{% macro gen_module_import(import) -%}
+    {% set name = import.name -%}
+    {% if "version" in import -%}
+        {% set ver = import.version -%}
+        {% set name = name ~ "_" ~ ver -%}
+    {% endif -%}
+    {% set name = macro::mod_name(raw=name) -%}
+
+    {% set path = root ~ "/modules/" ~ name ~ ".rs" -%}
+
+    #[path = "{{ path }}"]
+    pub mod {{ macro::mod_name(raw=import.name) }};
+{% endmacro -%}
+
+{% macro gen_module(module) -%}
+    {{ macro::gen_inner_doc(item=module) }}
+    {{ macro::gen_utils() }}
+
+    {% for block in module.blocks | sort(attribute="name") -%}
+        {{ block::gen_block(block=block) }}
+    {% endfor -%}
+
+    {% for bitfield in module.bitfields | sort(attribute="name") -%}
+        {{ bitfield::gen_bitfield(bitfield=bitfield) }}
+    {% endfor -%}
+    
+    {% for enum in module.enums | sort(attribute="name") -%}
+        {{ enum::gen_enum(enum=enum) }}
+    {% endfor -%}
+{% endmacro gen_module -%}
+
+{{ self::gen_module(module=module) }}

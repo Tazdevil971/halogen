@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = [
+    "halogen-ir",
+    "halogen-backend",
+    "halogen-frontend",
+    "halogen-cli"
+]
+
+[workspace.dependencies]
+halogen-ir.path = "halogen-ir"
+halogen-backend.path = "halogen-backend"
+halogen-frontend.path = "halogen-frontend"
+halogen-cli.path = "halogen-cli"
+
+rayon = "1.10"
+anyhow = "1"
+log = "0.4"

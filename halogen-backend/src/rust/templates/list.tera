@@ -1,0 +1,11 @@
+{% import "macro.tera" as macro -%}
+
+{% macro gen_list(chips) -%}
+    pub const CHIPS_LIST: [&str; {{ chips | length }}] = [
+        {% for chip in chips | sort(attribute="name") -%}
+        "{{ chip.name | snake_case | escape_keyword }}",
+        {% endfor -%}
+    ];
+{% endmacro gen_list -%}
+
+{{ self::gen_list(chips=chips) }}

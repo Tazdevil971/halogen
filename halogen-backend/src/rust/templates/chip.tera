@@ -1,0 +1,24 @@
+{% import "macro.tera" as macro -%}
+{% import "module.tera" as module -%}
+{% import "peripheral.tera" as peripheral -%}
+{% import "cm_reg.tera" as cm_reg -%}
+
+{% macro gen_chip(chip) -%}
+    {{ macro::gen_utils() }}
+
+    {% for import in chip.imports | sort(attribute="name") -%}
+        {{ module::gen_module_import(import=import) }}
+    {% endfor -%}
+
+    {% for peripheral in chip.peripherals | sort(attribute="address") -%}
+        {{ peripheral::gen_peripheral(peripheral=peripheral) }}
+    {% endfor -%}
+
+    {% if "cm_ext" in chip -%}
+        {% for cm_reg in chip.cm_ext.cm_regs | sort(attribute="name") -%}
+            {{ cm_reg::gen_cm_reg(cm_reg=cm_reg) }}
+        {% endfor -%}
+    {% endif -%}
+{% endmacro gen_chip -%}
+
+{{ self::gen_chip(chip=chip) }}

@@ -1,0 +1,78 @@
+{% macro gen_doc(item) -%}
+    {% if "description" in item -%}
+    #[doc = {{ item.description | stringify }}]
+    {% endif -%}
+{% endmacro gen_doc -%}
+
+{% macro gen_inner_doc(item) -%}
+    {% if "description" in item -%}
+    #![doc = "{{ item.description }}"]
+    {% endif -%}
+{% endmacro gen_doc -%}
+
+{% macro gen_utils() -%}
+    {% if utils == "super" -%}
+        #[allow(unused_imports)]
+        use super::utils;
+    {% elif utils == "embed" -%}
+        pub mod utils { {% include "utils.rs" -%} }
+    {% elif utils == "none" -%}
+
+    {% else -%}
+        {{ throw(message="unrecognized utils type") }}
+    {% endif -%}
+{% endmacro gen_utils -%}
+
+{% macro gen_type(size) -%}
+    {% if size > 64 -%}
+        {{ throw(message="cannot gen type with size > 64") }}
+    {% elif size > 32 -%}
+        u64
+    {% elif size > 16 -%}
+        u32
+    {% elif size > 8 -%}
+        u16
+    {% else -%}
+        u8
+    {% endif -%}
+{% endmacro gen_type -%}
+
+{% macro gen_access(access) -%}
+    {% if access == "rw" -%}
+        utils::RW
+    {% elif access == "ro" -%}
+        utils::RO
+    {% elif access == "wo" -%}
+        utils::WO
+    {% else -%}
+        {{ throw(message="unrecognized access") }}
+    {% endif -%}
+{% endmacro gen_access -%}
+
+{% macro field_name(raw) -%}
+    {{- raw | snake_case | escape_keyword -}}
+{% endmacro -%}
+
+{% macro mod_name(raw) -%}
+    {{- raw | snake_case | escape_keyword -}}
+{% endmacro -%}
+
+{% macro const_name(raw) -%}
+    {{- raw | shouty_snake_case | escape_keyword -}}
+{% endmacro -%}
+
+{% macro type_name(raw) -%}
+    {{- raw | upper_camel_case | escape_keyword -}}
+{% endmacro -%}
+
+{% macro block_name(raw) -%}
+    {{- self::type_name(raw=raw) -}}
+{% endmacro -%}
+
+{% macro bitfield_name(raw) -%}
+    {{- self::type_name(raw=raw ~ "Bits") -}}
+{% endmacro -%}
+
+{% macro enum_name(raw) -%}
+    {{- self::type_name(raw=raw ~ "Val") -}}
+{% endmacro %}

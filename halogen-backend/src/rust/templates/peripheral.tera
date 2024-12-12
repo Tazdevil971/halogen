@@ -1,0 +1,13 @@
+{% import "macro.tera" as macro -%}
+
+{% macro gen_peripheral(peripheral) -%}
+    {% set mod_name = macro::mod_name(raw=peripheral.module) -%}
+    {% set peri_name = macro::const_name(raw=peripheral.name) -%}
+    {% set type = macro::block_name(raw=peripheral.block_name) -%}
+    {% set type = mod_name ~ "::" ~ type -%}
+
+    {{ macro::gen_doc(item=peripheral) }}
+    pub const {{ peri_name }}: {{ type }} = unsafe { 
+        <{{ type }}>::from_addr({{ peripheral.address | hex }}) 
+    };
+{% endmacro %}

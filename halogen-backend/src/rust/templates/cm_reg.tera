@@ -1,0 +1,41 @@
+{% import "macro.tera" as macro -%}
+
+{% macro gen_cm_reg(cm_reg) -%}
+    {% set mod_name = macro::mod_name(raw=cm_reg.module) -%}
+    {% set reg_name = macro::mod_name(raw=cm_reg.name) -%}
+    {% set type = macro::bitfield_name(raw=cm_reg.bitfield_name) -%}
+    {% set type = mod_name ~ "::" ~ type -%}
+
+    {{ macro::gen_doc(item=cm_reg) }}
+    pub mod {{ reg_name }} {
+        #[allow(unused_imports)]
+        use super::*;
+            
+        {% if cm_reg.access == "ro" or cm_reg.access == "rw" -%}
+        pub unsafe fn read() -> {{ type }} {
+            let value: u32;
+            unsafe {
+                ::core::arch::asm!(
+                    "mrs {}, {{ cm_reg.reg_name }}",
+                    out(reg) value,
+                    options(nomem, nostack, preserves_flags)
+                );
+                <{{ type }}>::from_bits_unchecked(value)
+            }
+        }
+        {% endif -%}
+            
+        {% if cm_reg.access == "wo" or cm_reg.access == "rw" -%}
+        pub unsafe fn write(value: {{ type }}) {
+            let value = value.to_bits();
+            unsafe {
+                ::core::arch::asm!(
+                    "msr {{ cm_reg.reg_name }}, {}",
+                    in(reg) value,
+                    options(nomem, nostack, preserves_flags)
+                );
+            }
+        }
+        {% endif -%}
+    }
+{% endmacro -%}
