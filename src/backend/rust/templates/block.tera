@@ -1,0 +1,84 @@
+{% import "macro.tera" as macro %}
+{% import "register.tera" as register %}
+
+{% macro gen_block(block) %}
+
+    {% set name = block.name | upper_camel_case -%}
+    {% set mname = block.name | snake_case -%}
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    {{ macro::gen_doc(item=block) }}
+    pub struct {{ name }} {
+        ptr: *mut u8
+    }
+
+    impl {{ name }} {
+        #[inline(always)]
+        pub const unsafe fn from_ptr(ptr: *mut u8) -> Self {
+            Self { ptr }
+        }
+
+        #[inline(always)]
+        pub const fn as_ptr(&self) -> *mut u8 {
+            self.ptr
+        }
+
+        {% for field in block.fields -%}
+            {% set fname = field.name | snake_case -%}
+            {% if field.kind == "block" -%}
+                {% set ftype = field.name | upper_camel_case -%}
+                {% set ftype = mname ~ "::" ~ ftype -%}
+            {% elif field.kind == "register" -%}
+                {% if "fields" in field -%}
+                    {% set ftype = field.name | upper_camel_case -%}
+                    {% set ftype = mname ~ "::" ~ ftype -%}
+                {% else -%}
+                    {% set ftype = macro::gen_type(size=field.bit_size) -%}
+                {% endif -%}
+
+                {% set access = macro::gen_access(access=field.access) -%}
+                {% set ftype = utils ~ "::Reg<" ~ ftype ~ ", " ~ access ~ ">" -%}
+            {% else -%}
+                {{ throw(message="unrecognized block field type") }}
+            {% endif -%}
+
+            {% if "array" in field -%}
+                {% set base = field.byte_offset | hex -%}
+                {% set stride = field.array.stride | hex -%}
+                {% set offset = "(" ~ base ~ "+ idx *" ~ stride ~ ")" -%}
+            {% else -%}
+                {% set offset = field.byte_offset | hex -%}
+            {% endif -%}
+
+            #[inline(always)]
+            {{ macro::gen_doc(item=field) }}
+            {% if "array" in field -%}
+            pub const fn {{ fname }}(&self, idx: usize) -> {{ ftype }} {
+                assert!(idx < {{ field.array.len }});
+            {% else -%}
+            pub const fn {{ fname }}(&self) -> {{ ftype }} {
+            {% endif -%}
+                unsafe {
+                    let ptr = self.ptr.add({{ offset }});
+                    <{{ ftype }}>::from_ptr(ptr)
+                }
+            }
+        {% endfor -%}
+    }
+
+    {% set register_fields = block.fields | filter(attribute="kind", value="register") | filter(attribute="fields") -%}
+    {% set block_fields = block.fields | filter(attribute="kind", value="block") -%}
+
+    {% if register_fields | length > 0 or block_fields | length > 0 -%}
+    pub mod {{ mname }} {
+        {% for field in block_fields -%}
+        {{ self::gen_block(block=field) }}
+        {% endfor -%}
+
+        {% for field in register_fields -%}
+        {{ register::gen_register(register=field) }}
+        {% endfor -%}
+    }
+    {% endif -%}
+
+{% endmacro gen_block %}

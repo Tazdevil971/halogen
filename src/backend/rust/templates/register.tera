@@ -1,0 +1,118 @@
+{% import "macro.tera" as macro %}
+
+{% macro gen_register(register) %}
+    {% if not "fields" in register -%}
+        {{ throw(message="tried to generate an empty register!") }}
+    {% endif -%}
+
+    {% set type = macro::gen_type(size=register.bit_size) -%}
+    {% set name = register.name | upper_camel_case -%}
+    {% set mname = register.name | snake_case -%}
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[repr(transparent)]
+    {{ macro::gen_doc(item=register) }}
+    pub struct {{ name }} {
+        bits: {{ type }}
+    }
+
+    impl {{ name }} {
+        #[inline(always)]
+        pub const unsafe fn from_bits_unchecked(bits: {{ type }}) -> Self {
+            Self { bits }
+        }
+
+        #[inline(always)]
+        pub const fn to_bits(self) -> {{ type }} {
+            self.bits
+        }
+
+        {% for field in register.fields -%}
+            {% set fname = field.name | snake_case -%}
+            {% if "variants" in field -%}
+                {% set ftype = field.name | upper_camel_case -%}
+                {% set ftype = mname ~ "::" ~ ftype -%}
+            {% else -%}
+                {% set ftype = macro::gen_type(size=field.bit_size) -%}
+            {% endif -%}
+            {% set mask = field.bit_size | mask | hex -%}
+    
+            {% if "array" in field -%}
+                {% set base = field.bit_offset | hex -%}
+                {% set stride = field.array.stride | hex -%}
+                {% set offset = "(" ~ base ~ "+ idx *" ~ stride ~ ")" -%}
+            {% else -%}
+                {% set offset = field.bit_offset | hex -%}
+            {% endif -%}
+
+            #[inline(always)]
+            {{ macro::gen_doc(item=field) }}
+            {% if "array" in field -%}
+            pub const fn {{ "set_" ~ fname }}(mut self, idx: usize, val: {{ ftype }}) -> Self {
+                assert!(idx < {{ field.array.len }});
+            {% else -%}
+            pub const fn {{ "set_" ~ fname }}(mut self, val: {{ ftype }}) -> Self {
+            {% endif -%}
+                self.val &= !({{ mask }} << {{ offset }});
+                {% if "variants" in field -%}
+                self.val |= (val.to_bits() & {{ mask }}) << {{ offset }};
+                {% else -%}
+                self.val |= (val & {{ mask }}) << {{ offset }};
+                {% endif -%}
+                self
+            }
+            
+            #[inline(always)]
+            {{ macro::gen_doc(item=field) }}
+            {% if "array" in field -%}
+            pub const fn {{ fname }}(self, idx: usize) -> {{ ftype }} {
+                assert!(idx < {{ field.array.len }});
+            {% else -%}
+            pub const fn {{ fname }}(self) -> {{ ftype }} {
+            {% endif -%}
+                {% if "variants" in field -%}
+                let val = ((self.val >> {{ offset }}) & {{ mask }}) as _;
+                unsafe {
+                    {{ ftype ~ "::from_bits_unchecked" }}(val)
+                }
+                {% else -%}
+                ((self.val >> {{ offset }}) & {{ mask }}) as _
+                {% endif -%}
+            }
+        {% endfor -%}
+    }
+
+    {% set enum_fields = register.fields | filter(attribute="variants") -%}
+
+    {% if enum_fields | length > 0 -%}
+    pub mod {{ mname }} {
+        {% for field in enum_fields -%}
+
+        {% set type = macro::gen_type(size=field.bit_size) -%}
+        {% set name = field.name | upper_camel_case -%}
+
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        {{ macro::gen_doc(item=field) }}
+        #[repr({{ type }})]
+        pub enum {{ name }} {
+            {% for variant in field.variants -%}
+            {{ macro::gen_doc(item=variant) }}
+            {{ variant.name | upper_camel_case }} = {{ variant.value | hex }},
+            {% endfor -%}
+        }
+
+        impl {{ name }} {
+            #[inline(always)]
+            pub const unsafe fn from_bits_unchecked(bits: {{ type }}) -> Self {
+                ::core::mem::transmute(bits)
+            }
+
+            #[inline(always)]
+            pub const fn to_bits(self) -> {{ type }} {
+                self as {{ type }}
+            }
+        }
+        {% endfor -%}
+    }
+    {% endif -%}
+{% endmacro gen_register %}

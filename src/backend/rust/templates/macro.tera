@@ -1,0 +1,31 @@
+{% macro gen_doc(item) -%}
+    {% if "description" in item -%}
+    #[doc = "{{ item.description }}"]
+    {% endif -%}
+{% endmacro gen_doc -%}
+
+{% macro gen_type(size) -%}
+    {% if size > 64 -%}
+        {{ throw(message="cannot gen type with size > 64") }}
+    {% elif size > 32 -%}
+        u64
+    {% elif size > 16 -%}
+        u32
+    {% elif size > 8 -%}
+        u16
+    {% else -%}
+        u8
+    {% endif -%}
+{% endmacro gen_type -%}
+
+{% macro gen_access(access) -%}
+    {% if access == "ReadWrite" -%}
+        {{ utils }}::RW
+    {% elif access == "Read" -%}
+        {{ utils }}::R
+    {% elif access == "Write" -%}
+        {{ utils }}::W
+    {% else -%}
+        {{ throw(message="unrecognized access") }}
+    {% endif -%}
+{% endmacro gen_access -%}

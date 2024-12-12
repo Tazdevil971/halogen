@@ -1,0 +1,42 @@
+{% macro gen_register(register, base) %}
+    {% if not "fields" in register %}
+        {{ throw(message="tried to generate an empty register!") }}
+    {% endif %}
+
+    {% set name = register.name | upper_snake_case %}
+    {% set name = base ~ "_" ~ name  %}
+
+    {% for field in register.fields %}
+        {% set fname = field.name | upper_snake_case %}
+
+        {% set mask = field.bit_size | mask | hex %}
+
+        {% if "array" in field %}
+            {% set base = field.bit_offset | hex %}
+            {% set stride = field.array.stride | hex %}
+            {% set offset = "(" ~ base ~ "+ idx2 *" ~ stride ~ ")" %}
+        {% else %}
+            {% set offset = field.bit_offset | hex %}
+        {% endif %}
+
+        #define {{ name ~ fname ~ "_OFFSET" }} {{ field.bit_offset }}
+        #define {{ name ~ fname ~ "_MASK" }} {{ mask }}
+
+        {% if "array" in field %}
+        #define {{ name ~ "_SET_" ~ fname }}(reg, val, idx) \
+            do { \
+                size_t idx2 = (idx); \
+                assert(idx2 < {{ field.array.len }}); \
+        {% else %} \
+        #define {{ name ~ "_SET_" ~ fname }}(reg, val) \
+            do { \
+        {% endif %} \
+                reg &= ~({{ mask }} << {{ offset }}); \
+                {% if "variants" in field %} \
+                {{ throw(message="TODO") }}
+                {% else %} \
+                reg |= (val & {{ mask }}) << {{ offset }}; \
+                {% endif %} \
+            } while(0)
+    {% endfor %}
+{% endmacro gen_register %}

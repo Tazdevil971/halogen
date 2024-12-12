@@ -1,0 +1,4 @@
+{% import "register.tera" as register %}
+{% import "block.tera" as block %}
+
+{{ block::gen_block(block=ir) }}
