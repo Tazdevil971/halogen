@@ -1,0 +1,78 @@
+{% import "macro.tera" as macro %}
+
+{% macro gen_bitfield(bitfield) %}
+    {% set type = macro::gen_type(size=bitfield.bit_size) -%}
+    {% set name = bitfield.name | to_type_name -%}
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[repr(transparent)]
+    {{ macro::gen_doc(item=bitfield) }}
+    pub struct {{ name }} {
+        bits: {{ type }}
+    }
+
+    impl {{ name }} {
+        #[inline(always)]
+        pub const unsafe fn from_bits_unchecked(bits: {{ type }}) -> Self {
+            Self { bits }
+        }
+
+        #[inline(always)]
+        pub const fn to_bits(self) -> {{ type }} {
+            self.bits
+        }
+
+        {% for field in bitfield.fields | sort(attribute="bit_offset") -%}
+            {% set fname = field.name | to_fn_name -%}
+            {% if "enum" in field -%}
+                {% set ftype = field.enum | to_type_name -%}
+            {% else -%}
+                {% set ftype = macro::gen_type(size=field.bit_size) -%}
+            {% endif -%}
+            {% set mask = field.bit_size | mask | hex -%}
+    
+            {% if "array" in field -%}
+                {% set base = field.bit_offset | hex -%}
+                {% set stride = field.array.stride | hex -%}
+                {% set offset = "(" ~ base ~ "+ idx *" ~ stride ~ ")" -%}
+            {% else -%}
+                {% set offset = field.bit_offset | hex -%}
+            {% endif -%}
+
+            #[inline(always)]
+            {{ macro::gen_doc(item=field) }}
+            {% if "array" in field -%}
+            pub const fn {{ "set_" ~ fname }}(mut self, idx: usize, val: {{ ftype }}) -> Self {
+                assert!(idx < {{ field.array.len }});
+            {% else -%}
+            pub const fn {{ "set_" ~ fname }}(mut self, val: {{ ftype }}) -> Self {
+            {% endif -%}
+                self.val &= !({{ mask }} << {{ offset }});
+                {% if "enum" in field -%}
+                self.val |= (val.to_bits() & {{ mask }}) << {{ offset }};
+                {% else -%}
+                self.val |= (val & {{ mask }}) << {{ offset }};
+                {% endif -%}
+                self
+            }
+            
+            #[inline(always)]
+            {{ macro::gen_doc(item=field) }}
+            {% if "array" in field -%}
+            pub const fn {{ fname }}(self, idx: usize) -> {{ ftype }} {
+                assert!(idx < {{ field.array.len }});
+            {% else -%}
+            pub const fn {{ fname }}(self) -> {{ ftype }} {
+            {% endif -%}
+                {% if "enum" in field -%}
+                let val = ((self.val >> {{ offset }}) & {{ mask }}) as _;
+                unsafe {
+                    {{ ftype ~ "::from_bits_unchecked" }}(val)
+                }
+                {% else -%}
+                ((self.val >> {{ offset }}) & {{ mask }}) as _
+                {% endif -%}
+            }
+        {% endfor -%}
+    }
+{% endmacro gen_bitfield %}

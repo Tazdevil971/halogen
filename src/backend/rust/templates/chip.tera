@@ -1,0 +1,40 @@
+{% import "macro.tera" as macro %}
+{% import "module.tera" as module %}
+
+{% macro gen_chip(chip) %}
+    {{ macro::gen_inner_doc(item=chip) }}
+    
+    {% for peripheral in chip.peripherals | sort(attribute="address") -%}
+        {% set pname = peripheral.name | to_const_name -%}
+        {% set mname = peripheral.module | to_mod_name -%}
+        {% set bname = peripheral.block | to_type_name -%}
+
+        {% set type = mname ~ "::" ~ bname %}
+
+        {{ macro::gen_doc(item=peripheral) }}
+        pub const {{ pname }}: {{ type }} = {{ type }}::from_ptr({{ peripheral.address | hex }} as _);
+
+    {% endfor %}
+
+    {% set modules = chip.modules | sort(attribute="name") -%}
+
+    {% for module in modules -%}
+        {% if "kind" in module -%}
+            {% if module.kind == "import" %}
+                {{ module::gen_module_import(module=module) }}
+            {% else %}
+                {{ throw(message="unrecognized module type") }}
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% for module in modules -%}
+        {% if "kind" not in module -%}
+            {{ module::gen_module_inline(module=module) }}
+        {% endif %}
+    {% endfor %}
+
+{% endmacro gen_chip %}
+
+{{ macro::gen_utils() }}
+{{ self::gen_chip(chip=chip) }}

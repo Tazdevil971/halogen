@@ -1,0 +1,38 @@
+{% import "block.tera" as block %}
+{% import "bitfield.tera" as bitfield %}
+{% import "enum.tera" as enum %}
+{% import "macro.tera" as macro %}
+
+{% macro gen_module_inline(module) %}
+    pub mod {{ module.name | to_mod_name }} {
+        use super::utils;
+        {{ self::gen_module(module=module) }}
+    }
+{% endmacro gen_module_inline %}
+
+{% macro gen_module_import(module) %}
+    {% set name = module.name | lower -%}
+    {% set ver = module.version | lower -%}
+
+    {% set path = root ~ "/modules/" ~ name ~ "_" ~ ver ~ ".rs" -%}
+
+    #[path = "{{ path }}"]
+    mod {{ module.name | to_mod_name }};
+{% endmacro %}
+
+{% macro gen_module(module) %}
+    {{ macro::gen_inner_doc(item=module) }}
+
+    {% for block in module.blocks | sort(attribute="name") -%}
+        {{ block::gen_block(block=block) }}
+    {% endfor %}
+    {% for bitfield in module.bitfields | sort(attribute="name") -%}
+        {{ bitfield::gen_bitfield(bitfield=bitfield) }}
+    {% endfor %}
+    {% for enum in module.enums | sort(attribute="name") -%}
+        {{ enum::gen_enum(enum=enum) }}
+    {% endfor %}
+{% endmacro gen_module %}
+
+{{ macro::gen_utils() }}
+{{ self::gen_module(module=module) }}

@@ -1,0 +1,43 @@
+[package]
+name = "halogen"
+version = "0.1.0"
+edition = "2021"
+authors = ["Davide Mor <tazdevil971@gmail.com>"]
+
+[features]
+default = [
+    "frontend-chiptool", "frontend-stm32-data", 
+    "backend-rust", "backend-cpp", "backend-c", 
+    "rayon"
+]
+
+frontend-stm32-data = ["dep:stm32-data-serde", "frontend-chiptool"]
+frontend-chiptool = ["dep:chiptool"]
+backend-rust = ["dep:tera", "dep:heck"]
+backend-cpp = ["dep:tera", "dep:heck"]
+backend-c = ["dep:tera", "dep:heck"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+tera = { version = "1.20", optional = true }
+heck = { version = "0.5", optional = true }
+
+rayon = { version = "1.10", optional = true }
+
+anyhow = "1"
+log = "0.4"
+env_logger = "0.11"
+
+serde_json = "1"
+serde_yml = "0.0.12"
+
+[dependencies.stm32-data-serde]
+git = "https://github.com/embassy-rs/stm32-data.git"
+rev = "ddb0e7abab14bf3e1399875767b8834442382988"
+optional = true
+
+[dependencies.chiptool]
+git = "https://github.com/embassy-rs/chiptool.git"
+rev = "1c198ae678ebd426751513f0deab6fbd6f8b8211"
+optional = true
